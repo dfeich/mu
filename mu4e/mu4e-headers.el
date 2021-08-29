@@ -347,6 +347,9 @@ In the format needed for `mu4e-read-option'.")
   "If non-nil, report on the time it took to render the messages.
 This is mostly useful for profiling.")
 
+(defvar mu4e-is-opening-link nil
+  "Synchronization variable for remembering we have to set focus to header frame.")
+
 (defun mu4e~headers-clear (&optional msg)
   "Clear the header buffer and related data structures."
   (when (buffer-live-p (mu4e-get-headers-buffer))
@@ -814,6 +817,12 @@ after the end of the search results."
           (- (float-time) mu4e~headers-render-start)
           mu4e~headers-render-start nil))
   (when (buffer-live-p (mu4e-get-headers-buffer))
+    (when mu4e-is-opening-link
+      ;; set focus to headers frame
+      (setq mu4e-is-opening-link nil)
+      (let ((win (get-buffer-window (mu4e-get-headers-buffer) 0)))
+        (select-frame-set-input-focus (window-frame win))
+        (select-window win)))
     (with-current-buffer (mu4e-get-headers-buffer)
       (save-excursion
         (goto-char (point-max))
@@ -831,23 +840,23 @@ after the end of the search results."
           (unless (zerop count)
             (mu4e-message "%s" msg))))
 
-          ;; if we need to jump to some specific message, do so now
-          (goto-char (point-min))
-          (when mu4e~headers-msgid-target
-            (if (eq (current-buffer) (window-buffer))
-                (mu4e-headers-goto-message-id mu4e~headers-msgid-target)
-              (let* ((pos (mu4e-headers-goto-message-id mu4e~headers-msgid-target)))
-                (when pos
-                  (set-window-point (get-buffer-window nil t) pos)))))
-          (when (and mu4e~headers-view-target (mu4e-message-at-point 'noerror))
-            ;; view the message at point when there is one.
-            (mu4e-headers-view-message))
-          (setq mu4e~headers-view-target nil
-                mu4e~headers-msgid-target nil)
-          (when (mu4e~headers-docid-at-point)
-            (mu4e~headers-highlight (mu4e~headers-docid-at-point)))))
-    ;; run-hooks
-    (run-hooks 'mu4e-headers-found-hook))
+      ;; if we need to jump to some specific message, do so now
+      (goto-char (point-min))
+      (when mu4e~headers-msgid-target
+        (if (eq (current-buffer) (window-buffer))
+            (mu4e-headers-goto-message-id mu4e~headers-msgid-target)
+          (let ((pos (mu4e-headers-goto-message-id mu4e~headers-msgid-target)))
+            (when pos
+              (set-window-point (get-buffer-window nil t) pos)))))
+      (when (and mu4e~headers-view-target (mu4e-message-at-point 'noerror))
+        ;; view the message at point when there is one.
+        (mu4e-headers-view-message))
+      (setq mu4e~headers-view-target nil
+            mu4e~headers-msgid-target nil)
+      (when (mu4e~headers-docid-at-point)
+        (mu4e~headers-highlight (mu4e~headers-docid-at-point)))))
+  ;; run-hooks
+  (run-hooks 'mu4e-headers-found-hook))
 
 
 ;;; Marking
